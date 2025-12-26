@@ -7,7 +7,7 @@ interface LogoIconProps {
 }
 
 export const LogoIcon = ({ size = 40, className = '', animate = false }: LogoIconProps) => {
-  const strokeWidth = size / 20;
+  const strokeWidth = size / 25;
   
   return (
     <motion.svg
@@ -22,7 +22,7 @@ export const LogoIcon = ({ size = 40, className = '', animate = false }: LogoIco
     >
       {/* Outer diamond shape */}
       <motion.path
-        d="M50 5 L95 50 L50 95 L5 50 Z"
+        d="M50 2 L98 50 L50 98 L2 50 Z"
         stroke="currentColor"
         strokeWidth={strokeWidth}
         fill="none"
@@ -31,25 +31,36 @@ export const LogoIcon = ({ size = 40, className = '', animate = false }: LogoIco
         transition={{ duration: 1, ease: 'easeInOut' }}
       />
       
-      {/* Inner geometric arrow/chevron - matching the logo */}
+      {/* Inner geometric arrow - recreating the exact logo shape */}
       <motion.g
         initial={animate ? { opacity: 0, scale: 0.8 } : { opacity: 1, scale: 1 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3, duration: 0.5 }}
       >
-        {/* Left arrow part */}
+        {/* Main arrow shape pointing down-left */}
+        {/* Upper left diagonal */}
         <path
-          d="M30 35 L50 55 L50 75 L30 55 Z"
+          d="M28 30 L50 52 L50 30 L28 30"
           fill="currentColor"
         />
-        {/* Right arrow part */}
+        {/* Upper right diagonal */}
         <path
-          d="M70 35 L50 55 L50 75 L70 55 Z"
+          d="M50 30 L72 30 L50 52 L50 30"
           fill="currentColor"
         />
-        {/* Top connector */}
+        {/* Lower left part */}
         <path
-          d="M30 35 L50 15 L70 35 L50 55 Z"
+          d="M28 52 L50 74 L50 52 L28 52"
+          fill="currentColor"
+        />
+        {/* Lower section connecting */}
+        <path
+          d="M28 30 L28 52 L50 52 L28 30"
+          fill="currentColor"
+        />
+        {/* Right side triangle */}
+        <path
+          d="M50 52 L72 30 L72 52 L50 52"
           fill="currentColor"
         />
       </motion.g>
