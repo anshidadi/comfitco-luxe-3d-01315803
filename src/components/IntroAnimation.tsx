@@ -115,17 +115,17 @@ export const IntroAnimation = ({ onComplete }: IntroAnimationProps) => {
                 }}
                 style={{ transformStyle: 'preserve-3d', perspective: 1000 }}
               >
-                <LogoIcon size={120} className="text-foreground" />
+                <LogoIcon size={140} />
               </motion.div>
               
               {/* Glow effect */}
               <motion.div
-                className="absolute inset-0 blur-2xl"
+                className="absolute inset-0 blur-2xl opacity-50"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: [0.3, 0.6, 0.3] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                <LogoIcon size={120} className="text-accent" />
+                <div className="w-full h-full bg-accent rounded-full" />
               </motion.div>
             </motion.div>
 

@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Package, ShoppingBag, Upload, Trash2 } from 'lucide-react';
+import { X, Plus, Package, ShoppingBag, Upload, Trash2, Image } from 'lucide-react';
 import { Product, Order } from '../types';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -22,6 +24,9 @@ export const AdminPanel = ({
 }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('orders');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newProduct, setNewProduct] = useState({
     name: '',
     price: '',
@@ -29,8 +34,49 @@ export const AdminPanel = ({
     image: '',
   });
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      setNewProduct({ ...newProduct, image: publicUrl });
+      toast.success('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+      setPreviewImage(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleAddProduct = () => {
-    if (!newProduct.name || !newProduct.price || !newProduct.image) return;
+    if (!newProduct.name || !newProduct.price || !newProduct.image) {
+      toast.error('Please fill all fields and upload an image');
+      return;
+    }
 
     onAddProduct({
       name: newProduct.name,
@@ -40,6 +86,13 @@ export const AdminPanel = ({
     });
 
     setNewProduct({ name: '', price: '', category: 'casual', image: '' });
+    setPreviewImage(null);
+    setIsAddingProduct(false);
+  };
+
+  const handleCancel = () => {
+    setNewProduct({ name: '', price: '', category: 'casual', image: '' });
+    setPreviewImage(null);
     setIsAddingProduct(false);
   };
 
@@ -221,6 +274,53 @@ export const AdminPanel = ({
                         >
                           <h3 className="font-semibold text-lg">Add New Product</h3>
 
+                          {/* Image Upload Section */}
+                          <div>
+                            <label className="block text-sm font-medium mb-2">
+                              Product Image
+                            </label>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="hidden"
+                            />
+                            <motion.div
+                              className={`relative border-2 border-dashed rounded-xl overflow-hidden cursor-pointer transition-colors ${
+                                previewImage ? 'border-accent' : 'border-border hover:border-foreground'
+                              }`}
+                              onClick={() => fileInputRef.current?.click()}
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                            >
+                              {previewImage ? (
+                                <div className="relative aspect-[3/4] w-full max-w-[200px]">
+                                  <img
+                                    src={previewImage}
+                                    alt="Preview"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  {isUploading && (
+                                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                                      <motion.div
+                                        className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full"
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-12 px-4 text-muted-foreground">
+                                  <Image className="w-12 h-12 mb-3 opacity-50" />
+                                  <p className="text-sm font-medium">Click to upload image</p>
+                                  <p className="text-xs mt-1">PNG, JPG, WEBP accepted</p>
+                                </div>
+                              )}
+                            </motion.div>
+                          </div>
+
                           <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-2">
                               <label className="block text-sm font-medium mb-2">
@@ -268,25 +368,13 @@ export const AdminPanel = ({
                                 <option value="trendy">Trendy</option>
                               </select>
                             </div>
-
-                            <div className="col-span-2">
-                              <label className="block text-sm font-medium mb-2">Image URL</label>
-                              <input
-                                type="url"
-                                value={newProduct.image}
-                                onChange={(e) =>
-                                  setNewProduct({ ...newProduct, image: e.target.value })
-                                }
-                                className="w-full px-4 py-3 bg-card rounded-xl border border-border focus:border-accent outline-none"
-                                placeholder="https://example.com/image.jpg"
-                              />
-                            </div>
                           </div>
 
                           <div className="flex gap-2 pt-4">
                             <motion.button
-                              className="flex-1 py-3 bg-foreground text-background font-semibold rounded-xl"
+                              className="flex-1 py-3 bg-foreground text-background font-semibold rounded-xl disabled:opacity-50"
                               onClick={handleAddProduct}
+                              disabled={isUploading || !newProduct.image}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                             >
@@ -295,7 +383,7 @@ export const AdminPanel = ({
                             </motion.button>
                             <motion.button
                               className="px-6 py-3 bg-card rounded-xl"
-                              onClick={() => setIsAddingProduct(false)}
+                              onClick={handleCancel}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                             >
