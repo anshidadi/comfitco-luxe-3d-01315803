@@ -2,7 +2,11 @@ import { motion } from 'framer-motion';
 import { ArrowDown, Sparkles } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
 
-export const HeroSection = () => {
+interface HeroSectionProps {
+  onShopClick?: () => void;
+}
+
+export const HeroSection = ({ onShopClick }: HeroSectionProps) => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
       {/* Animated background */}
@@ -135,6 +139,7 @@ export const HeroSection = () => {
             className="group relative px-8 py-4 bg-foreground text-background font-semibold rounded-xl overflow-hidden"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={onShopClick}
           >
             <span className="relative z-10">Shop Collection</span>
             <motion.div

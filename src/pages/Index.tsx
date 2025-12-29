@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { IntroAnimation } from '../components/IntroAnimation';
 import { Navbar } from '../components/Navbar';
@@ -10,23 +10,27 @@ import { OrderSuccessModal } from '../components/OrderSuccessModal';
 import { AdminLogin } from '../components/AdminLogin';
 import { AdminPanel } from '../components/AdminPanel';
 import { Footer } from '../components/Footer';
-import { Product, Order, Category } from '../types';
+import { Product, Category } from '../types';
+import { useProducts } from '../hooks/useProducts';
+import { useOrders } from '../hooks/useOrders';
+import { supabase } from '@/integrations/supabase/client';
 
-const initialProducts: Product[] = [
-  { id: '1', name: 'Elegant Maxi Dress', price: 2499, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=600&h=800&fit=crop', category: 'party-wear' },
-  { id: '2', name: 'Casual Summer Dress', price: 1299, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&h=800&fit=crop', category: 'casual' },
-  { id: '3', name: 'Traditional Anarkali', price: 3499, image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=600&h=800&fit=crop', category: 'ethnic' },
-  { id: '4', name: 'Trendy Wrap Dress', price: 1899, image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&h=800&fit=crop', category: 'trendy' },
-  { id: '5', name: 'Floral Print Dress', price: 1599, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=600&h=800&fit=crop', category: 'casual' },
-  { id: '6', name: 'Sequin Party Dress', price: 4299, image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&h=800&fit=crop', category: 'party-wear' },
-  { id: '7', name: 'Bohemian Maxi', price: 2199, image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=600&h=800&fit=crop', category: 'trendy' },
-  { id: '8', name: 'Classic Silk Saree', price: 5999, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&h=800&fit=crop', category: 'ethnic' },
+// Initial products to seed if database is empty
+const initialProducts: Omit<Product, 'id'>[] = [
+  { name: 'Elegant Maxi Dress', price: 2499, image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=600&h=800&fit=crop', category: 'party-wear' },
+  { name: 'Casual Summer Dress', price: 1299, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&h=800&fit=crop', category: 'casual' },
+  { name: 'Traditional Anarkali', price: 3499, image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=600&h=800&fit=crop', category: 'ethnic' },
+  { name: 'Trendy Wrap Dress', price: 1899, image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&h=800&fit=crop', category: 'trendy' },
+  { name: 'Floral Print Dress', price: 1599, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=600&h=800&fit=crop', category: 'casual' },
+  { name: 'Sequin Party Dress', price: 4299, image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&h=800&fit=crop', category: 'party-wear' },
+  { name: 'Bohemian Maxi', price: 2199, image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=600&h=800&fit=crop', category: 'trendy' },
+  { name: 'Classic Silk Saree', price: 5999, image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&h=800&fit=crop', category: 'ethnic' },
 ];
 
 const Index = () => {
   const [showIntro, setShowIntro] = useState(true);
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { products, loading: productsLoading, addProduct, deleteProduct } = useProducts();
+  const { orders, createOrder } = useOrders();
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -34,6 +38,24 @@ const Index = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  // Seed initial products if database is empty
+  useEffect(() => {
+    const seedProducts = async () => {
+      if (!productsLoading && products.length === 0) {
+        const { count } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true });
+
+        if (count === 0) {
+          for (const product of initialProducts) {
+            await addProduct(product);
+          }
+        }
+      }
+    };
+    seedProducts();
+  }, [productsLoading, products.length]);
 
   const filteredProducts = activeCategory === 'all' 
     ? products 
@@ -44,22 +66,20 @@ const Index = () => {
     setShowOrderModal(true);
   };
 
-  const handleOrderSubmit = (formData: OrderFormData) => {
+  const handleOrderSubmit = async (formData: OrderFormData) => {
     if (!selectedProduct) return;
     
-    const newOrder: Order = {
-      id: Date.now().toString(),
+    const success = await createOrder({
       productId: selectedProduct.id,
       productName: selectedProduct.name,
-      productImage: selectedProduct.image,
       productPrice: selectedProduct.price,
       ...formData,
-      createdAt: new Date(),
-    };
-    
-    setOrders(prev => [newOrder, ...prev]);
-    setShowOrderModal(false);
-    setShowSuccessModal(true);
+    });
+
+    if (success) {
+      setShowOrderModal(false);
+      setShowSuccessModal(true);
+    }
   };
 
   const handleWishlist = useCallback((product: Product) => {
@@ -70,12 +90,19 @@ const Index = () => {
     );
   }, []);
 
-  const handleAddProduct = (product: Omit<Product, 'id'>) => {
-    setProducts(prev => [...prev, { ...product, id: Date.now().toString() }]);
+  const handleAddProduct = async (product: Omit<Product, 'id'>) => {
+    await addProduct(product);
   };
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
+  const handleDeleteProduct = async (id: string) => {
+    await deleteProduct(id);
+  };
+
+  const scrollToCollection = () => {
+    const element = document.getElementById('collection');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   return (
@@ -87,12 +114,12 @@ const Index = () => {
         wishlistCount={wishlist.length}
         onCartClick={() => {}}
         onWishlistClick={() => {}}
-        onFilterClick={() => {}}
+        onFilterClick={scrollToCollection}
         onAdminClick={() => setShowAdminLogin(true)}
       />
 
       <main>
-        <HeroSection />
+        <HeroSection onShopClick={scrollToCollection} />
 
         {/* Products Section */}
         <section id="collection" className="py-20 px-4">
@@ -125,23 +152,33 @@ const Index = () => {
               <CategoryFilter activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
             </div>
 
-            <motion.div 
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8"
-              layout
-            >
-              {filteredProducts.map((product, index) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onOrder={handleOrder}
-                  onWishlist={handleWishlist}
-                  isWishlisted={wishlist.includes(product.id)}
-                  index={index}
+            {productsLoading ? (
+              <div className="flex justify-center py-20">
+                <motion.div
+                  className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                 />
-              ))}
-            </motion.div>
+              </div>
+            ) : (
+              <motion.div 
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8"
+                layout
+              >
+                {filteredProducts.map((product, index) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onOrder={handleOrder}
+                    onWishlist={handleWishlist}
+                    isWishlisted={wishlist.includes(product.id)}
+                    index={index}
+                  />
+                ))}
+              </motion.div>
+            )}
 
-            {filteredProducts.length === 0 && (
+            {!productsLoading && filteredProducts.length === 0 && (
               <motion.div
                 className="text-center py-20"
                 initial={{ opacity: 0 }}
